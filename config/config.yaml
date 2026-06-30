@@ -1,0 +1,7 @@
+llm:
+  groq:
+    provider: "groq"
+    model: "openai/gpt-oss-120b"
+  huggingface:
+    provider: "huggingface"
+    model: "meta-llama/Llama-2-70b-chat-hf"
