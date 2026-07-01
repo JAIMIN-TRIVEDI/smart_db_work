@@ -28,7 +28,7 @@ def get_requirements()->List[str]:
 print(get_requirements())
 
 setup(
-    name="AI-TRAVEL-PLANNER",
+    name="SMART_DB_WORK",
     version="0.0.1",
     author="Jaimin Trivedi",
     author_email="trivedij481@gmail.com",

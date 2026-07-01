@@ -1,41 +1,82 @@
 from utils.model_loader import ModelLoader
-from prompt_library.prompt import SYSTEM_PROMPT
-from langgraph.graph import StateGraph, MessagesState, END, START
-from langgraph.prebuilt import ToolNode, tools_condition
+from prompt_library.prompt import (
+    INTENT_DETECTION_PROMPT,
+    IntentDetectionOutput,
+)
 
-# from tools.weather_info_tool import WeatherInfoTool
-# from tools.place_search_tool import PlaceSearchTool
-# from tools.expense_calculator_tool import CalculatorTool
-# from tools.currency_conversion_tool import CurrencyConverterTool
+from langgraph.graph import StateGraph, START, END
+from State.DBState import AgentState
 
-class Graph:
-    def __init__(self,model_provider: str = "groq"):
-        self.model_loader = ModelLoader(model_provider=model_provider)
+
+class GraphBuilder:
+
+    def __init__(self, model_provider: str = "groq"):
+
+        self.model_loader = ModelLoader(
+            model_provider=model_provider
+        )
+
         self.llm = self.model_loader.load_llm()
-        
-        self.tools = []
 
         self.graph = None
-        
-        self.system_prompt = SYSTEM_PROMPT
 
-    def agentic_function(self):
-        pass
+    def intent_detection_node(self, state: AgentState):
+
+        structured_llm = self.llm.with_structured_output(
+            IntentDetectionOutput
+        )
+
+        chain = (
+            INTENT_DETECTION_PROMPT
+            | structured_llm
+        )
+
+        result = chain.invoke(
+            {
+                "user_query": state.user_query
+            }
+        )
+
+        print(
+            f"Identified Intent: {result.identified_intent.value}"
+        )
+
+        # Return only updated fields
+        return {
+            "identified_intent": result.identified_intent.value
+        }
 
     def build_graph(self):
-        graph_builder=StateGraph(MessagesState)
 
-        graph_builder.add_node("agent", self.agent_function)
-        graph_builder.add_node("tools", ToolNode(tools=self.tools))
+        workflow = StateGraph(AgentState)
 
-        graph_builder.add_edge(START,"agent")
-        graph_builder.add_conditional_edges("agent",tools_condition)
-        graph_builder.add_edge("tools","agent")
-        graph_builder.add_edge("agent",END)
+        workflow.add_node(
+            "intent_detection",
+            self.intent_detection_node,
+        )
 
-        self.graph = graph_builder.compile()
-        
+        workflow.add_edge(
+            START,
+            "intent_detection",
+        )
+
+        workflow.add_edge(
+            "intent_detection",
+            END,
+        )
+
+        self.graph = workflow.compile()
+
         return self.graph
 
+    def invoke(self, state: AgentState):
+        if self.graph is None:
+            self.build_graph()
+
+        return self.graph.invoke(state)
+
     def __call__(self):
-        return self.build_graph()
+        if self.graph is None:
+            self.build_graph()
+
+        return self.graph
