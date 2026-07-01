@@ -17,10 +17,7 @@ class IntentType(str, Enum):
 
 
 class IntentDetectionOutput(BaseModel):
-    identified_intent: IntentType = Field(
-        ...,
-        description="The detected user intent."
-    )
+    identified_intent: IntentType = Field(..., description="The detected user intent.")
 
 
 INTENT_DETECTION_PROMPT = ChatPromptTemplate.from_messages(
@@ -53,15 +50,51 @@ Supported intents:
 
 Classify the user query into exactly one intent.
 Return your answer using the required structured output schema.
-"""
+""",
         ),
         (
             "human",
             """
 User Query:
-
 {user_query}
-"""
+""",
         ),
     ]
 )
+
+
+class QueryGenerationOutput(BaseModel):
+    generated_query: str = Field(..., description="The generated SQL query.")
+
+
+QUERY_GENERATION_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """
+You are an expert Database Query Generation Agent.
+
+Your ONLY responsibility is to generate SQL queries based on the user's intent and query .
+Always ensure that the generated SQL query is syntactically correct and optimized for performance.
+Always ensure that the generated SQL query is compatible with database schema if provided.
+
+Do NOT:
+- Explain SQL
+- Guess database schema
+- Ask questions
+
+Generate the most appropriate SQL query for the given intent and user query.
+Return your answer using the required structured output schema.
+""",
+        ),
+        (
+            "human",
+            """
+User Query:{user_query}
+Intent:{intent}
+Schema Info:    
+        """,
+        ),
+    ]
+)
+# {schema_info}
