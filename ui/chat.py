@@ -62,7 +62,15 @@ class ChatUI:
 
                     graph = GraphBuilder()
 
-                    state = AgentState(user_query=prompt)
+                    print("Project title:", project.title)
+                    print("Available connections:", connection_manager.list_connections())
+
+                    connector = project.connector   
+
+                    state = AgentState(
+                        user_query=prompt,
+                        db_connection=connector
+                    )
 
                     result = graph.invoke(state)
 

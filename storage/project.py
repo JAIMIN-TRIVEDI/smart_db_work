@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 from db_models.database import DatabaseConfig
 
 
@@ -17,6 +18,8 @@ class Project:
     chat_history: list = field(default_factory=list)
 
     created_at: datetime = field(default_factory=datetime.now)
+
+    connector: Any = None
 
     def add_message(self, role, content):
 

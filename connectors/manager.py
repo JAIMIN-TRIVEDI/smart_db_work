@@ -16,11 +16,13 @@ class ConnectionManager:
     def __init__(self):
 
         # connection_name -> connector
+        print("ConnectionManager created")
         self.connections = {}
 
     ########################################################
 
     def connect(self, connection_name: str, config: DatabaseConfig):
+
 
         db = config.database_type.lower()
 
@@ -39,6 +41,10 @@ class ConnectionManager:
         connector.connect(config)
 
         self.connections[connection_name] = connector
+
+        print(f"Saving connection: {connection_name}")
+        self.connections[connection_name] = connector
+        print(self.connections.keys())
 
         return connector
 

@@ -1,3 +1,4 @@
+from logging import config
 from uuid import uuid4
 
 from storage.project import Project
@@ -24,6 +25,7 @@ class ProjectManager:
             title=title,
             connection_name=title,
             database_config=db_config,
+            connector=connector 
         )
 
         self.projects[project.id] = project

@@ -20,6 +20,11 @@ class AgentState(BaseModel):
         description="High-level intent of the user (SELECT, INSERT, UPDATE, DELETE, ANALYTICS, etc.)."
     )
 
+    db_connection: Any = Field(
+        default=None,
+        description="Active database connection."
+    )
+
     # Retrieved database schema relevant to the query
     schema: Optional[Dict[str, Any]] = Field(
         default=None,

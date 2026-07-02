@@ -8,7 +8,7 @@ from prompt_library.prompt import (
 
 from langgraph.graph import StateGraph, START, END
 from State.DBState import AgentState
-
+from tools.database_tools import execute_query, get_schema
 
 class GraphBuilder:
 
@@ -16,6 +16,18 @@ class GraphBuilder:
 
         self.model_loader = ModelLoader(model_provider=model_provider)
         self.llm = self.model_loader.load_llm()
+
+        self.tools = []
+
+        self.execute_query_tool = execute_query
+        self.get_schema_tool = get_schema
+
+        self.tools.extend([
+        self.execute_query_tool,
+            self.get_schema_tool,
+        ])
+
+        self.llm_with_tools = self.llm.bind_tools(tools=self.tools)
         self.graph = None
 
     def intent_detection_node(self, state: AgentState):
@@ -31,6 +43,9 @@ class GraphBuilder:
     def query_generation_node(self, state: AgentState):
         structured_llm = self.llm.with_structured_output(QueryGenerationOutput)
         chain = QUERY_GENERATION_PROMPT | structured_llm
+        result2 = self.llm.invoke(state.user_query)
+        print(f"LLM Response: {result2.content}")
+
         result = chain.invoke(
             {
                 "user_query": state.user_query,

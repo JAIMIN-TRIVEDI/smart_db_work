@@ -53,6 +53,7 @@ class ConnectionForm:
             )
 
             self.project_manager.create_project(project_name, config)
+            print(connection_manager.list_connections())
 
             st.success("Connected Successfully")
 

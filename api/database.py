@@ -35,7 +35,7 @@ def connect_database(config: DatabaseConfig):
 
     try:
 
-        connection_manager.connect(config)
+        connection_manager.connect(config.database, config)
 
         return MessageResponse(success=True, message="Database connected successfully.")
 
