@@ -107,3 +107,21 @@ class MySQLConnector:
             raise DatabaseConnectionError("Database not connected.")
 
         return self.SessionLocal()
+    
+    def execute_query(self, query: str):
+
+        if self.engine is None:
+            raise DatabaseConnectionError("Database not connected.")
+
+        with self.engine.connect() as conn:
+
+            result = conn.execute(text(query))
+
+            try:
+                return [dict(row._mapping) for row in result]
+            except Exception:
+                conn.commit()
+                return {
+                    "success": True,
+                    "rows_affected": result.rowcount,
+                }
