@@ -11,4 +11,12 @@ wheels/
 dbenv/
 .env
 
+# Local runtime database files
+chatbot.db
+chatbot.db-wal
+chatbot.db-shm
+
+storage/data/projects.db
+storage/data/projects.json
+
 test.py
