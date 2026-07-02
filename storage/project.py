@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
+
 from db_models.database import DatabaseConfig
+from storage.conversation import Conversation
 
 
 @dataclass
@@ -15,12 +17,45 @@ class Project:
 
     database_config: DatabaseConfig
 
-    chat_history: list = field(default_factory=list)
+    connector: Any = None
+
+    conversations: list[Conversation] = field(default_factory=list)
+
+    active_conversation: str | None = None
 
     created_at: datetime = field(default_factory=datetime.now)
 
-    connector: Any = None
+    #######################################################
 
-    def add_message(self, role, content):
+    def create_conversation(self, title="New Chat"):
 
-        self.chat_history.append({"role": role, "content": content})
+        conversation = Conversation(title=title)
+
+        self.conversations.append(conversation)
+
+        self.active_conversation = conversation.id
+
+        return conversation
+
+    #######################################################
+
+    def get_active_conversation(self):
+
+        if self.active_conversation is None:
+
+            return None
+
+        for conversation in self.conversations:
+
+            if conversation.id == self.active_conversation:
+
+                return conversation
+
+        return None
+
+    #######################################################
+
+    def switch_conversation(self, conversation_id):
+
+        self.active_conversation = conversation_id
+

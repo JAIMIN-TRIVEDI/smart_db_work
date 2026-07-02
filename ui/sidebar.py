@@ -9,6 +9,8 @@ class Sidebar:
 
         self.project_manager = project_manager
 
+    ########################################################
+
     def render(self):
 
         with st.sidebar:
@@ -17,17 +19,42 @@ class Sidebar:
 
             st.divider()
 
-            # Create Project Button
-            if st.button("➕ New Project", use_container_width=True):
+            if st.button(
+                "➕ New Project",
+                use_container_width=True
+            ):
                 st.session_state.show_connection_form = True
 
+            project = self.project_manager.get_current_project()
+
+            ####################################################
+            ## New Chat
+            ####################################################
+
+            if project is not None:
+
+                if st.button(
+                    "💬 New Chat",
+                    use_container_width=True
+                ):
+
+                    project.create_conversation(
+                        f"Chat {len(project.conversations)+1}"
+                    )
+
+                    st.rerun()
+
             st.divider()
+
+            ####################################################
+            ## Projects
+            ####################################################
 
             projects = self.project_manager.list_projects()
 
             if not projects:
 
-                st.info("No projects created.")
+                st.info("No Projects Created")
 
                 return
 
@@ -35,38 +62,78 @@ class Sidebar:
 
                 self.render_project(project)
 
-    #####################################################
+    ########################################################
 
     def render_project(self, project):
 
-        col1, col2 = st.columns([6, 1])
+        expanded = (
+            self.project_manager.current_project
+            == project.id
+        )
 
-        active = self.project_manager.current_project == project.id
+        with st.expander(
+            project.title,
+            expanded=expanded
+        ):
 
-        title = project.title
+            col1, col2 = st.columns([5,1])
 
-        if active:
-            title = "🟢 " + title
+            with col1:
 
-        with col1:
+                if st.button(
+                    "Open",
+                    key=f"project_{project.id}",
+                    use_container_width=True
+                ):
 
-            if st.button(
-                title,
-                key=f"select_{project.id}",
-                use_container_width=True,
-            ):
+                    self.project_manager.switch_project(
+                        project.id
+                    )
 
-                self.project_manager.switch_project(project.id)
+                    st.rerun()
 
-                st.rerun()
+            with col2:
 
-        with col2:
+                if st.button(
+                    "🗑",
+                    key=f"delete_{project.id}"
+                ):
 
-            if st.button(
-                "🗑",
-                key=f"delete_{project.id}",
-            ):
+                    self.project_manager.delete_project(
+                        project.id
+                    )
 
-                self.project_manager.delete_project(project.id)
+                    st.rerun()
 
-                st.rerun()
+            ####################################################
+            ## Conversations
+            ####################################################
+
+            for conversation in project.conversations:
+
+                active = (
+                    conversation.id
+                    == project.active_conversation
+                )
+
+                title = conversation.title
+
+                if active:
+
+                    title = "🟢 " + title
+
+                if st.button(
+
+                    title,
+
+                    key=f"conversation_{conversation.id}",
+
+                    use_container_width=True
+
+                ):
+
+                    project.switch_conversation(
+                        conversation.id
+                    )
+
+                    st.rerun()

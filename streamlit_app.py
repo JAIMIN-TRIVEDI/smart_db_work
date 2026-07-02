@@ -10,7 +10,9 @@ st.set_page_config(page_title="Smart DB Agent", layout="wide")
 
 if "project_manager" not in st.session_state:
 
-    st.session_state.project_manager = ProjectManager()
+    pm = ProjectManager()
+
+    st.session_state.project_manager = pm
 
 if "show_connection_form" not in st.session_state:
 

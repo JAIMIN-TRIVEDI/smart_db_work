@@ -1,12 +1,47 @@
-from typing import Any, Dict, List, Optional
-
 from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional, Annotated
 
+from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
 
 class AgentState(BaseModel):
     """
     Shared state passed between LangGraph nodes.
     """
+
+        ########################################################
+    # LangGraph Conversation State
+    ########################################################
+
+    messages: Annotated[
+        List[BaseMessage],
+        add_messages,
+    ] = Field(
+        default_factory=list,
+        description="Conversation history stored by LangGraph."
+    )
+
+    
+
+    project_id: Optional[str] = Field(
+        default=None,
+        description="Current project id."
+    )
+
+    conversation_id: Optional[str] = Field(
+        default=None,
+        description="Current conversation id."
+    )
+
+    thread_id: Optional[str] = Field(
+        default=None,
+        description="LangGraph persistence thread id."
+    )
+
+    connection_name: Optional[str] = Field(
+    default=None,
+    description="Connection name registered in              ConnectionManager."
+    )
 
     # Original user input
     user_query: str = Field(
