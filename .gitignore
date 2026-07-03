@@ -20,4 +20,5 @@ storage/data/projects.db
 storage/data/projects.json
 storage/data/app_state.sqlite3
 storage/data/schema_vectors/*
+
 test.py
