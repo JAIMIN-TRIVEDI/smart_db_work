@@ -108,7 +108,7 @@ class MySQLConnector:
 
         return self.SessionLocal()
     
-    def execute_query(self, query: str):
+    def execute_query(self, query: str) -> dict:
 
         if self.engine is None:
             raise DatabaseConnectionError("Database not connected.")
@@ -118,10 +118,91 @@ class MySQLConnector:
             result = conn.execute(text(query))
 
             try:
-                return [dict(row._mapping) for row in result]
+                rows = [dict(row._mapping) for row in result]
+
+                return {
+                    "success": True,
+                    "query_type": "SELECT",
+                    "rows": rows
+                }
+            
             except Exception:
                 conn.commit()
                 return {
                     "success": True,
+                    "query_type":"MODIFICATION",
                     "rows_affected": result.rowcount,
+                    "rows": []
                 }
+
+    def get_schema(self) -> dict:
+
+        """
+        Returns complete database schema.
+
+        {
+            "table1": {
+                "columns": [
+                    {
+                        "name": "...",
+                        "type": "...",
+                        "nullable": True,
+                        "key": "PRI"
+                    }
+                ]
+            }
+        }
+        """
+
+        if self.engine is None:
+            raise DatabaseConnectionError("Database not connected.")
+
+        schema = {}
+
+        with self.engine.connect() as conn:
+
+            tables = conn.execute(
+                text(
+                    """
+                    SELECT TABLE_NAME
+                    FROM INFORMATION_SCHEMA.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE();
+                    """
+                )
+            )
+
+            table_names = [row[0] for row in tables]
+
+            for table in table_names:
+
+                columns = conn.execute(
+                    text(
+                        """
+                        SELECT
+                            COLUMN_NAME,
+                            DATA_TYPE,
+                            IS_NULLABLE,
+                            COLUMN_KEY
+                        FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE()
+                        AND TABLE_NAME = :table;
+                        """
+                    ),
+                    {
+                        "table": table
+                    }
+                )
+
+                schema[table] = {
+                    "columns": [
+                        {
+                            "name": row.COLUMN_NAME,
+                            "type": row.DATA_TYPE,
+                            "nullable": row.IS_NULLABLE == "YES",
+                            "key": row.COLUMN_KEY,
+                        }
+                        for row in columns
+                    ]
+                }
+
+        return schema

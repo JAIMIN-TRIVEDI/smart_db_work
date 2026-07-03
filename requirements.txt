@@ -1,19 +1,90 @@
-langchain
-langchain-community
-langchain-experimental
-fastapi
-python-dotenv
-streamlit
-uvicorn
-pydantic
-httpx
-requests
-langchain_google_community
-langchain_tavily
-langchain_groq
-langchain_openai
-langgraph
+# ===========================
+# Core LLM Framework
+# ===========================
+
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-experimental>=0.3.0
+
+# ===========================
+# LangGraph
+# ===========================
+
+langgraph>=0.2.60
+langgraph-checkpoint
+langgraph-checkpoint-sqlite
+
+# ===========================
+# LLM Providers
+# ===========================
+
+langchain-groq
+langchain-openai
+langchain-google-community
 langchain-google-community[places]
 
+# ===========================
+# Vector Database (RAG)
+# ===========================
+
+chromadb
+langchain-chroma
+
+# ===========================
+# Embedding Models
+# ===========================
+
+sentence-transformers
+langchain-huggingface
+
+# ===========================
+# Database
+# ===========================
+
+sqlalchemy
+pymysql
+pymongo
+
+# ===========================
+# Streamlit
+# ===========================
+
+streamlit
+
+# ===========================
+# API
+# ===========================
+
+fastapi
+uvicorn
+httpx
+requests
+
+# ===========================
+# Configuration
+# ===========================
+
+python-dotenv
+pydantic
+pyyaml
+
+# ===========================
+# Utilities
+# ===========================
+
+pandas
+tabulate
+orjson
+
+# ===========================
+# Optional Monitoring
+# ===========================
+
+langsmith
+
+# ===========================
+# Project
+# ===========================
 
 -e .

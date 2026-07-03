@@ -1,232 +1,173 @@
+from langgraph.graph import StateGraph, START, END
+
 from storage.checkpointer import checkpointer
 
-from langchain_core.messages import HumanMessage, AIMessage
-
-from utils.model_loader import ModelLoader
-from prompt_library.prompt import (
-    INTENT_DETECTION_PROMPT,
-    IntentDetectionOutput,
-    QUERY_GENERATION_PROMPT,
-    QueryGenerationOutput,
-)
-
-from langgraph.graph import StateGraph, START, END
 from State.DBState import AgentState
 
-from connectors.manager import connection_manager
+# Nodes
+from agent.nodes.user_query_node import UserQueryNode
+from agent.nodes.non_database_query_node import NonDatabaseQueryNode
+from agent.nodes.schema_fetch_node import SchemaFetchNode
+from agent.nodes.sql_generation_node import SQLGenerationNode
+from agent.nodes.execute_query_node import ExecuteQueryNode
+from agent.nodes.demo_application_node import DemoApplicationNode
+from agent.nodes.response_node import ResponseNode
 
-from tools.database_tools import execute_query, get_schema
+
+# Routers
+from agent.routers.intent_router import IntentRouter
+from agent.routers.condition_router import ConditionRouter
+
 
 class GraphBuilder:
 
-    def __init__(self, model_provider: str = "groq"):
+    def __init__(self):
 
-        self.model_loader = ModelLoader(model_provider=model_provider)
-        self.llm = self.model_loader.load_llm()
+        # Nodes
 
-        self.tools = []
+        self.user_query_node = UserQueryNode()
 
-        self.execute_query_tool = execute_query
-        self.get_schema_tool = get_schema
+        self.non_database_query_node = NonDatabaseQueryNode()
 
-        self.tools.extend([
-        self.execute_query_tool,
-            self.get_schema_tool,
-        ])
+        self.schema_fetch_node = SchemaFetchNode()
 
-        self.llm_with_tools = self.llm.bind_tools(tools=self.tools)
-        self.graph = None
+        self.sql_generation_node = SQLGenerationNode()
 
-    def intent_detection_node(self, state: AgentState):
-        structured_llm = self.llm.with_structured_output(IntentDetectionOutput)
-        chain = INTENT_DETECTION_PROMPT | structured_llm
-        query = state.user_query
+        self.execute_query_node = ExecuteQueryNode()
 
-        if state.messages:
-            last_message = state.messages[-1]
+        self.demo_application_node = DemoApplicationNode()
+    
+        self.response_node = ResponseNode()
 
-            if isinstance(last_message, HumanMessage):
-                query = last_message.content
+        # Routers
 
-        result = chain.invoke(
-            {
-                "user_query": query
-            }
-        )
+        self.intent_router = IntentRouter()
 
-        print(f"Identified Intent: {result.identified_intent.value}")
-
-        # Return only updated fields
-        return {"identified_intent": result.identified_intent.value}
-
-    def query_generation_node(self, state: AgentState):
-        structured_llm = self.llm.with_structured_output(QueryGenerationOutput)
-        chain = QUERY_GENERATION_PROMPT | structured_llm
-        query = state.user_query
-
-        if state.messages:
-            last_message = state.messages[-1]
-
-            if isinstance(last_message, HumanMessage):
-                query = last_message.content
-
-        result2 = self.llm.invoke(query)
-
-        print(f"LLM Response: {result2.content}")
-
-        result = chain.invoke(
-            {
-                "user_query": query,
-                "intent": state.identified_intent,
-                # "db_schema": state.db_schema or None,
-            }
-        )
-
-        print(f"Generated Query: {result.generated_query}")
-
-        # Return only updated fields [State]
-        return {
-            "sql_query": result.generated_query,
-            "sql_query_intent": result.generated_query.split()[0].upper(),
-            "messages": [
-                AIMessage(content=result.generated_query)
-            ]
-        }
-
-    #  Newly Added Nodes for Intent Based Routing and Query Execution
-    # TODO : Complete the node logic
-
-    def route_after_generation(self, state: AgentState):
-
-        sql = state.sql_query.strip().upper()
-
-        if sql.startswith("SELECT"):
-
-            return "execute"
-
-        return "end"
-
-    def intent_based_routing_node(self, state: AgentState):
-        if state.identified_intent == "SELECT":
-            return {"next_node": "select_query_execution"}
-        else:
-            # Default routing
-            return {"next_node": END}
-
-
-
-    def select_query_execution_node(self, state: AgentState):
-
-        connector = connection_manager.get_connection(state.connection_name)
-
-        result = connector.execute_query(state.sql_query)
-
-        print(f"Query Execution Result: {result}")
-
-        return {
-            "execution_result": result
-        }
+        self.condition_router = ConditionRouter()
 
     def build_graph(self):
 
         workflow = StateGraph(AgentState)
 
+        ##################################################
+        # Register Nodes
+        ##################################################
+
         workflow.add_node(
-            "intent_detection",
-            self.intent_detection_node
+            "user_query",
+            self.user_query_node
         )
 
         workflow.add_node(
-            "query_generation",
-            self.query_generation_node
+            "non_db_query",
+            self.non_database_query_node
         )
 
         workflow.add_node(
-            "select_query_execution",
-            self.select_query_execution_node
+            "schema_fetch",
+            self.schema_fetch_node
         )
+
+        workflow.add_node(
+            "generate_sql",
+            self.sql_generation_node
+        )
+
+        workflow.add_node(
+            "execute_query",
+            self.execute_query_node
+        )
+
+        workflow.add_node(
+            "response",
+            self.response_node
+        )
+
+        workflow.add_node(
+            "demo_application",
+            self.demo_application_node
+        )
+
+        ##################################################
+        # Start
+        ##################################################
 
         workflow.add_edge(
             START,
-            "intent_detection"
+            "user_query"
         )
 
-        workflow.add_edge(
-            "intent_detection",
-            "query_generation"
-        )
+        ##################################################
+        # Intent Routing
+        ##################################################
 
         workflow.add_conditional_edges(
-            "query_generation",
-            self.route_after_generation,
+            "user_query",
+            self.intent_router,
             {
-                "execute": "select_query_execution",
-                "end": END,
-            }
+                "schema_fetch": "schema_fetch",
+                "non_db_query": "non_db_query",
+            },
         )
 
+        ##################################################
+        # Non DB Query
+        ##################################################
+
         workflow.add_edge(
-            "select_query_execution",
+            "non_db_query",
             END
         )
 
-        self.graph = workflow.compile(
-            checkpointer=checkpointer
+        ##################################################
+        # Schema
+        ##################################################
+
+        workflow.add_edge(
+            "schema_fetch",
+            "generate_sql"
         )
 
-        return self.graph
-    
-    # def invoke(self, state: AgentState, thread_id: str):
+        ##################################################
+        # SQL Routing
+        ##################################################
 
-    #     if self.graph is None:
-    #         self.build_graph()
+        workflow.add_conditional_edges(
+            "generate_sql",
+            self.condition_router,
+            {
+                "execute": "execute_query",
+                "demo": "demo_application",
+            },
+        )
 
-    #     config = {
-    #             "configurable": {
-    #             "thread_id": thread_id
-    #         }
-    #     }
+        ##################################################
+        # End
+        ##################################################
 
-    #     if state.user_query:
+        workflow.add_edge(
+            "execute_query",
+            "response"
+        )
 
-    #         state.messages.append(
-    #             HumanMessage(
-    #                 content=state.user_query
-    #             )
-    #         )
+        workflow.add_conditional_edges(
+            "demo_application",
+            lambda state: (
+                "execute"
+                if state.approval
+                else "end"
+            ),
+            {
+                "execute": "execute_query",
+                "end": END,
+            },
+        )
 
-    #     return self.graph.invoke(
-    #         state,
-    #         config=config
-    #     )
-    
-    def get_state(self, thread_id: str):
+        workflow.add_edge(
+            "response",
+            END
+        )
 
-        if self.graph is None:
-            self.build_graph()
-
-        config = {
-            "configurable": {
-                "thread_id": thread_id
-            }
-        }
-
-        return self.graph.get_state(config)
-
-    def list_threads(self):
-
-        threads = set()
-
-        for checkpoint in checkpointer.list(None):
-
-            threads.add(
-                checkpoint.config["configurable"]["thread_id"]
-            )
-
-        return list(threads)
-
-    # def __call__(self):
-    #     if self.graph is None:
-    #         self.build_graph()
-
-    #     return self.graph
+        return workflow.compile(
+            checkpointer=checkpointer
+        )

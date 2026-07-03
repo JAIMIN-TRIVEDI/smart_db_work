@@ -22,11 +22,13 @@ class ProjectManager:
         self.current_project = None
 
         self.load_projects()
+
     ########################################################
 
     def create_project(self, title, db_config):
 
         connector = connection_manager.connect(title, db_config)
+
 
         project = Project(
             id=str(uuid4()),
@@ -69,6 +71,8 @@ class ProjectManager:
 
         self.current_project = project_id
 
+        self.save_projects()
+        
     ########################################################
 
     def delete_project(self, project_id):
@@ -102,12 +106,16 @@ class ProjectManager:
 
         self.save_projects()
 
-    def new_chat(self,project_id):
+    def new_chat(self, project_id):
 
         project = self.projects[project_id]
 
-        return project.create_conversation()
+        conversation = project.create_conversation()
 
+        self.save_projects()
+
+        return conversation
+    
     def get_active_conversation(self):
 
         project = self.get_current_project()
@@ -128,9 +136,11 @@ class ProjectManager:
 
         project = self.projects[project_id]
 
+        conversation = project.create_conversation(title)
+
         self.save_projects()
 
-        return project.create_conversation(title)
+        return conversation
 
     ########################################################
 

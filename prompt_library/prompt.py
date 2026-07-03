@@ -1,7 +1,13 @@
 from enum import Enum
+
 from pydantic import BaseModel, Field
+
 from langchain_core.prompts import ChatPromptTemplate
 
+
+########################################################
+# Intent Detection
+########################################################
 
 class IntentType(str, Enum):
     SELECT = "SELECT"
@@ -17,7 +23,11 @@ class IntentType(str, Enum):
 
 
 class IntentDetectionOutput(BaseModel):
-    identified_intent: IntentType = Field(..., description="The detected user intent.")
+
+    identified_intent: IntentType = Field(
+        ...,
+        description="Detected user intent."
+    )
 
 
 INTENT_DETECTION_PROMPT = ChatPromptTemplate.from_messages(
@@ -27,29 +37,28 @@ INTENT_DETECTION_PROMPT = ChatPromptTemplate.from_messages(
             """
 You are an expert Database Intent Classification Agent.
 
-Your ONLY responsibility is to identify the user's intent.
+Your ONLY responsibility is to classify the user's database intent.
 
 Do NOT:
 - Generate SQL
 - Explain SQL
-- Guess database schema
 - Ask questions
+- Guess schema
 
 Supported intents:
 
-- SELECT
-- INSERT
-- UPDATE
-- DELETE
-- ANALYTICS
-- AGGREGATION
-- REPORT
-- SCHEMA_INFO
-- DATABASE_INFO
-- UNKNOWN
+SELECT
+INSERT
+UPDATE
+DELETE
+ANALYTICS
+AGGREGATION
+REPORT
+SCHEMA_INFO
+DATABASE_INFO
+UNKNOWN
 
-Classify the user query into exactly one intent.
-Return your answer using the required structured output schema.
+Return ONLY the structured output.
 """,
         ),
         (
@@ -62,9 +71,17 @@ User Query:
     ]
 )
 
+########################################################
+# SQL Generation
+########################################################
+
 
 class QueryGenerationOutput(BaseModel):
-    generated_query: str = Field(..., description="The generated SQL query.")
+
+    generated_query: str = Field(
+        ...,
+        description="Generated SQL query."
+    )
 
 
 QUERY_GENERATION_PROMPT = ChatPromptTemplate.from_messages(
@@ -72,29 +89,31 @@ QUERY_GENERATION_PROMPT = ChatPromptTemplate.from_messages(
         (
             "system",
             """
-You are an expert Database Query Generation Agent.
+You are an expert SQL Generation Agent.
 
-Your ONLY responsibility is to generate SQL queries based on the user's intent and query .
-Always ensure that the generated SQL query is syntactically correct and optimized for performance.
-Always ensure that the generated SQL query is compatible with database schema if provided.
+Generate a valid SQL query.
 
-Do NOT:
-- Explain SQL
-- Guess database schema
-- Ask questions
+Rules:
 
-Generate the most appropriate SQL query for the given intent and user query.
-Return your answer using the required structured output schema.
+- Use ONLY the provided schema.
+- Never invent table names.
+- Never invent column names.
+- Never explain anything.
+- Return ONLY the SQL query using the structured output.
 """,
         ),
         (
             "human",
             """
-User Query:{user_query}
-Intent:{intent}
-Schema Info:    
-        """,
+            User Query:
+            {user_query}
+
+            Intent:
+            {intent}
+
+            Database Schema:
+            {schema_info}
+            """,
         ),
     ]
 )
-# {schema_info}

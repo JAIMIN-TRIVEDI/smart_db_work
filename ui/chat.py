@@ -1,9 +1,10 @@
-import streamlit as st
 import traceback
 
-from agent.graph import chatbot
-from State.DBState import AgentState
+import streamlit as st
+
 from langchain_core.messages import HumanMessage, AIMessage
+
+from agent.graph import chatbot
 
 
 class ChatUI:
@@ -13,29 +14,58 @@ class ChatUI:
 
     ########################################################
 
-    def load_messages(self, conversation):
+    def _config(self, conversation):
 
-        config = {
+        return {
             "configurable": {
                 "thread_id": conversation.thread_id
             }
         }
 
+    ########################################################
+
+    def load_messages(self, conversation):
+
         try:
 
-            state = chatbot.get_state(config)
+            graph_state = chatbot.get_state(
+                self._config(conversation)
+            )
 
-            if state is None:
+            if graph_state is None:
                 return []
 
-            if not state.values:
+            if graph_state.values is None:
                 return []
 
-            return state.values.get("messages", [])
+            return graph_state.values.get(
+                "messages",
+                []
+            )
 
         except Exception:
 
             return []
+
+    ########################################################
+
+    def render_messages(self, conversation):
+
+        messages = self.load_messages(conversation)
+
+        for message in messages:
+
+            if isinstance(message, HumanMessage):
+
+                with st.chat_message("user"):
+
+                    st.markdown(message.content)
+
+            elif isinstance(message, AIMessage):
+
+                with st.chat_message("assistant"):
+
+                    st.markdown(message.content)
 
     ########################################################
 
@@ -59,29 +89,11 @@ class ChatUI:
 
         st.divider()
 
-        #######################################################
-        ## Load Chat
-        #######################################################
+        ######################################################
 
-        messages = self.load_messages(conversation)
+        self.render_messages(conversation)
 
-        for message in messages:
-
-            if isinstance(message, HumanMessage):
-
-                with st.chat_message("user"):
-
-                    st.markdown(message.content)
-
-            elif isinstance(message, AIMessage):
-
-                with st.chat_message("assistant"):
-
-                    st.markdown(message.content)
-
-        #######################################################
-        ## Chat Input
-        #######################################################
+        ######################################################
 
         prompt = st.chat_input(
             "Ask anything about your database..."
@@ -95,6 +107,8 @@ class ChatUI:
                 prompt
             )
 
+            st.rerun()
+
     ########################################################
 
     def process_query(
@@ -104,63 +118,36 @@ class ChatUI:
         prompt
     ):
 
-        with st.chat_message("user"):
+        try:
 
-            st.markdown(prompt)
+            chatbot.invoke(
 
-        with st.chat_message("assistant"):
+                {
 
-            with st.spinner("Thinking..."):
+                    "messages": [
 
-                try:
-
-                    state = AgentState(
-
-                        user_query=prompt,
-
-                        # db_connection=project.connector,
-
-                        connection_name=project.connection_name,
-
-                        project_id=project.id,
-
-                        conversation_id=conversation.id,
-
-                        thread_id=conversation.thread_id
-
-                    )
-
-                    config = {
-
-                        "configurable": {
-
-                            "thread_id": conversation.thread_id
-
-                        }
-
-                    }
-
-                    result = chatbot.invoke(
-                        input=state,
-                        config=config
-                    )
-
-                    answer = ""
-
-                    if isinstance(result, dict):
-
-                        answer = (
-                            result.get("sql_query")
-                            or result.get("answer")
-                            or str(result)
+                        HumanMessage(
+                            content=prompt
                         )
 
-                    else:
+                    ],
 
-                        answer = str(result)
+                    "project_id": project.id,
 
-                    st.markdown(answer)
+                    "conversation_id": conversation.id,
 
-                except Exception:
+                    "thread_id": conversation.thread_id,
 
-                    st.code(traceback.format_exc())
+                    "connection_name": project.connection_name,
+
+                },
+
+                config=self._config(conversation)
+
+            )
+
+        except Exception:
+
+            st.code(
+                traceback.format_exc()
+            )

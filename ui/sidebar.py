@@ -38,7 +38,8 @@ class Sidebar:
                     use_container_width=True
                 ):
 
-                    project.create_conversation(
+                    self.project_manager.create_conversation(
+                        project.id,
                         f"Chat {len(project.conversations)+1}"
                     )
 
@@ -132,7 +133,8 @@ class Sidebar:
 
                 ):
 
-                    project.switch_conversation(
+                    self.project_manager.switch_conversation(
+                        project.id,
                         conversation.id
                     )
 
