@@ -11,9 +11,14 @@ class SchemaFetchNode:
 
         print("=" * 80)
         print("Entered SchemaFetchNode")
-
+        print(self.schema_service)
         schema = self.schema_service.fetch_schema(state)
-
+        if not schema:
+            print("No schema found.")
+            return {
+                "schema_context": None,
+                "current_node": "schema_fetch",
+            }
         print("Schema fetched:")
         print(schema)
 

@@ -5,6 +5,7 @@ class ConditionRouter:
 
     READ_INTENTS = {
         "SELECT",
+        "SHOW",
         "ANALYTICS",
         "AGGREGATION",
         "REPORT",
@@ -14,7 +15,10 @@ class ConditionRouter:
 
     def __call__(self, state: AgentState):
 
-        if state.identified_intent in self.READ_INTENTS:
+        if (
+            state.identified_intent in self.READ_INTENTS
+            and state.requires_approval is not True
+        ):
             return "execute"
 
         return "demo"
