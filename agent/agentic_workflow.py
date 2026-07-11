@@ -13,6 +13,7 @@ from agent.nodes.investigation_node import InvestigationNode
 from agent.nodes.execute_query_node import ExecuteQueryNode
 from agent.nodes.demo_application_node import DemoApplicationNode
 from agent.nodes.response_node import ResponseNode
+from agent.nodes.finalize_query_node import FinalizeQueryNode
 
 # Routers
 from agent.routers.intent_router import IntentRouter
@@ -41,6 +42,8 @@ class GraphBuilder:
         self.demo_application_node = DemoApplicationNode()
 
         self.response_node = ResponseNode()
+
+        self.finalize_query_node = FinalizeQueryNode()
 
         # Routers
         self.intent_router = IntentRouter()
@@ -141,6 +144,11 @@ class GraphBuilder:
         workflow.add_node(
             "response",
             self.response_node,
+        )
+
+        workflow.add_node(
+            "finalize_query",
+            self.finalize_query_node,
         )
 
         ##################################################
@@ -255,7 +263,7 @@ class GraphBuilder:
             self._demo_router,
             {
                 "execute": "execute_query",
-                "end": END,
+                "end": "finalize_query",
             },
         )
 
@@ -265,6 +273,11 @@ class GraphBuilder:
 
         workflow.add_edge(
             "response",
+            "finalize_query",
+        )
+
+        workflow.add_edge(
+            "finalize_query",
             END,
         )
 

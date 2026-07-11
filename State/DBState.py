@@ -113,6 +113,18 @@ class AgentState(BaseModel):
     )
 
     ########################################################
+    # Persistent Query Turn History
+    ########################################################
+
+    query_history: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "Immutable snapshots of completed database query turns. "
+            "Persisted by the LangGraph checkpointer per thread."
+        ),
+    )
+
+    ########################################################
     # Workflow State
     ########################################################
 

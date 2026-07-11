@@ -4,11 +4,10 @@ from typing import Any
 
 from State.DBState import AgentState
 from agent.services.execution_service import ExecutionService
+from utils.query_types import is_read_query
 
 
 class DemoApplicationNode:
-    READ_INTENTS = {"SELECT", "SHOW"}
-
     def __init__(self):
         self.execution_service = ExecutionService()
 
@@ -108,7 +107,9 @@ class DemoApplicationNode:
         return after
 
     def __call__(self, state: AgentState):
-        if (state.identified_intent or "").upper() in self.READ_INTENTS:
+        if is_read_query(
+            state.identified_intent, state.query_type, state.generated_sql_query
+        ):
             return {"current_node": "demo_application", "demo_result": None}
 
         tables = self._tables(state)

@@ -176,6 +176,73 @@ class ChatUI:
             st.caption(extra_info)
 
     ########################################################
+    # PERSISTED QUERY HISTORY
+    ########################################################
+
+    READ_INTENTS = {
+        "SELECT", "SHOW", "DESCRIBE", "DESC", "EXPLAIN",
+        "ANALYTICS", "AGGREGATION", "REPORT",
+        "SCHEMA_INFO", "DATABASE_INFO",
+    }
+
+    @classmethod
+    def _is_read_turn(cls, turn):
+        if turn.get("is_read") is True:
+            return True
+        if str(turn.get("query_type") or "").lower() == "read":
+            return True
+        return str(turn.get("identified_intent") or "").upper() in cls.READ_INTENTS
+
+    def _render_saved_turn(self, turn):
+        with st.chat_message("user"):
+            st.markdown(turn.get("user_input") or "")
+
+        st.markdown("#### Generated Query")
+        st.code(turn.get("generated_sql_query") or "", language="sql")
+
+        if self._is_read_turn(turn):
+            st.markdown("#### Execution Result")
+            result = turn.get("execution_result")
+            rows = self._rows_from_result(result)
+            if rows:
+                st.dataframe(rows, width="stretch")
+            elif result is not None:
+                st.write(result)
+            else:
+                st.info("No result was returned.")
+            st.divider()
+            return
+
+        st.markdown("#### Query Plan")
+        c1, c2, c3 = st.columns(3)
+        confidence = turn.get("query_confidence")
+        c1.metric("Confidence", f"{confidence:.2f}" if isinstance(confidence, (int, float)) else "n/a")
+        c2.metric("Risk", turn.get("query_risk_level") or "n/a")
+        c3.metric("Approval", "Required" if turn.get("requires_approval") else "Not required")
+        if turn.get("query_reasoning"):
+            st.caption(turn["query_reasoning"])
+
+        demo = turn.get("demo_result")
+        if demo:
+            st.markdown("#### Demo Preview")
+            self._render_demo_result(None, demo)
+
+        result = turn.get("execution_result")
+        if result is not None:
+            st.markdown("#### Execution Result")
+            rows = self._rows_from_result(result)
+            st.dataframe(rows, width="stretch") if rows else st.write(result)
+        st.divider()
+
+    def render_query_history(self, conversation, exclude_latest=True):
+        state = self.load_graph_state(conversation)
+        history = list(state.get("query_history") or [])
+        if exclude_latest and history:
+            history = history[:-1]
+        for turn in history:
+            self._render_saved_turn(turn)
+
+    ########################################################
     # RENDER QUERY WORKBENCH
     ########################################################
 
@@ -189,6 +256,25 @@ class ChatUI:
         generated_sql = latest_state.get("generated_sql_query")
 
         if not generated_sql:
+            return
+
+        intent = (latest_state.get("identified_intent") or "").upper()
+        query_type = (latest_state.get("query_type") or "").lower()
+        is_direct_read = query_type == "read" or intent in self.READ_INTENTS
+
+        # Read queries intentionally show only generated query + execution result.
+        if is_direct_read:
+            st.markdown("#### Generated Query")
+            st.code(generated_sql, language="sql")
+            st.markdown("#### Execution Result")
+            execution_result = latest_state.get("execution_result")
+            rows = self._rows_from_result(execution_result)
+            if rows:
+                st.dataframe(rows, width="stretch")
+            elif execution_result is not None:
+                st.write(execution_result)
+            else:
+                st.info("The query was generated but no result was returned.")
             return
 
         ####################################################
@@ -211,15 +297,6 @@ class ChatUI:
 
         requires_approval = latest_state.get("requires_approval")
 
-        intent = (latest_state.get("identified_intent") or "").upper()
-
-        is_direct_read = intent in {
-            "SELECT",
-            "SHOW",
-            "DESCRIBE",
-            "DESC",
-            "EXPLAIN",
-        }
 
         ####################################################
         # QUERY METRICS
@@ -662,7 +739,11 @@ class ChatUI:
         # CHAT HISTORY
         ####################################################
 
-        self.render_messages(conversation)
+        graph_state = self.load_graph_state(conversation)
+        if graph_state.get("query_history"):
+            self.render_query_history(conversation, exclude_latest=True)
+        else:
+            self.render_messages(conversation)
 
         ####################################################
         # QUERY WORKBENCH
@@ -677,14 +758,60 @@ class ChatUI:
         prompt = st.chat_input("Ask anything about your database...")
 
         if prompt:
+            with st.chat_message("user"):
+                st.markdown(prompt)
 
-            self.process_query(
+            self.process_query_stream(
                 project,
                 conversation,
                 prompt,
             )
 
             st.rerun()
+
+    ########################################################
+    # STREAM QUERY PROGRESS
+    ########################################################
+
+    def process_query_stream(self, project, conversation, prompt):
+        labels = {
+            "user_query": "Understanding your request...",
+            "schema_fetch": "Retrieving relevant schema...",
+            "generate_sql": "Generating database query...",
+            "query_critic": "Validating generated query...",
+            "investigation": "Investigating database values safely...",
+            "condition_route": "Choosing safe execution path...",
+            "execute_query": "Executing read query...",
+            "demo_application": "Preparing demo preview...",
+            "response": "Preparing result...",
+            "finalize_query": "Saving query turn...",
+        }
+
+        try:
+            with st.status("Processing query...", expanded=True) as status:
+                for update in chatbot.stream(
+                    {
+                        "messages": [HumanMessage(content=prompt)],
+                        "project_id": project.id,
+                        "conversation_id": conversation.id,
+                        "thread_id": conversation.thread_id,
+                        "connection_name": project.connection_name,
+                        "database_config": project.database_config.model_dump(),
+                    },
+                    config=self._config(conversation),
+                    stream_mode="updates",
+                ):
+                    for node_name, node_update in update.items():
+                        st.write(labels.get(node_name, f"Running {node_name}..."))
+                        if node_name == "generate_sql" and isinstance(node_update, dict):
+                            sql = node_update.get("generated_sql_query")
+                            if sql:
+                                st.code(sql, language="sql")
+                status.update(label="Query processing complete", state="complete", expanded=False)
+
+        except Exception:
+            st.error("Failed to process the query.")
+            st.code(traceback.format_exc())
 
     ########################################################
     # PROCESS QUERY
